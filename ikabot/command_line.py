@@ -1,13 +1,7 @@
 #! /usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-import os
-import sys
-import gettext
 import multiprocessing
-import time
-import datetime
-from ikabot.config import *
 from ikabot.web.session import *
 from ikabot.helpers.gui import *
 from ikabot.function.donate import donate
@@ -42,7 +36,7 @@ from ikabot.function.decaptchaConf import decaptchaConf
 from ikabot.function.dumpWorld import dumpWorld
 from ikabot.function.stationArmy import stationArmy
 from ikabot.function.logs import logs
-
+from ikabot.function.godshrine import do_it_shrine
 
 t = gettext.translation('command_line', localedir, languages=languages, fallback=True)
 _ = t.gettext
@@ -105,6 +99,7 @@ def menu(session, checkUpdate=True):
         143:            killTasks,
         144:            decaptchaConf,
         145:            logs,
+        22:             do_it_shrine,
                     }
 
     print(_('(0)  Exit'))
@@ -129,6 +124,8 @@ def menu(session, checkUpdate=True):
     print(_('(19) Attack barbarians'))
     print(_('(20) Dump / View world'))
     print(_('(21) Options / Settings'))
+    print(_('(22) alert shrine'))
+
     total_options = len(menu_actions) + 1
     selected = read(min=0, max=total_options, digit=True)
     
