@@ -10,6 +10,7 @@ import traceback
 from decimal import *
 from ikabot.config import *
 from ikabot.helpers.gui import *
+from ikabot.helpers.random_wait import wait_random_minutes
 from ikabot.helpers.varios import *
 from ikabot.helpers.botComm import *
 from ikabot.helpers.pedirInfo import *
@@ -18,12 +19,9 @@ from ikabot.helpers.process import set_child_mode
 from ikabot.helpers.getJson import getCity
 from ikabot.helpers.signals import setInfoSignal
 from ikabot.helpers.planRoutes import waitForArrival
-
-t = gettext.translation('attackBarbarians', localedir, languages=languages, fallback=True)
+t = gettext.translation('auto_barbarians', localedir, languages=languages, fallback=True)
 _ = t.gettext
-
 getcontext().prec = 30
-
 
 def choose_island(session):
     idsIslands = getIslandsIds(session)
@@ -125,89 +123,62 @@ def get_units(session, city):
         units[unit_id]['amount'] = amount
     return units
 
+def determine_troop_amounts(barbarian_level):
+    """
+    Determines the amount of each unit to send based on the barbarian level.
+    Returns a dictionary with unit codes and their respective amounts.
+    """
+    if 1 <= barbarian_level <= 9:
+        # Define the units and amounts for levels 1-9
+        return {'303': 0, '308': 0, '302': 90, '304': 21, '307': 0, '305': 0, '312': 0, '309': 0, '310': 0, '311': 0}
+    elif 10 <= barbarian_level <= 19:
+        # Define the units and amounts for levels 10-19
+        return {'303': 0, '308': 50, '302': 60, '304': 35, '307': 0, '305': 12, '312': 0, '309': 0, '310': 0, '311': 0}
+    elif 20 <= barbarian_level <= 29:
+        # Define the units and amounts for levels 20-29
+        return {'303': 0, '308': 100, '302': 60, '304': 70, '307': 12, '305': 12, '312': 300, '309': 30, '310': 5, '311': 0}
+    else:
+        # Return an empty dictionary for levels outside the specified range
+        return {}
 
-def plan_attack(session, city, babarians_info):
+def select_units_for_attack(required_units, available_units):
+    """
+    Selects units for attack based on the required units and the units available in the city.
+    Returns a dictionary of units to be sent for attack.
+    """
+    units_to_send = {}
+    for unit_code, required_amount in required_units.items():
+        available_amount = available_units.get(unit_code, {'amount': 0})['amount']
+        units_to_send[unit_code] = min(required_amount, available_amount)
+    return units_to_send
+
+
+def plan_attack(session, city, barbarians_info):
+    barbarian_level = barbarians_info['level']
+    required_units = determine_troop_amounts(barbarian_level)
     total_units = get_units(session, city)
+    units_for_attack = select_units_for_attack(required_units, total_units)
 
     if sum([total_units[unit_id]['amount'] for unit_id in total_units]) == 0:
         print('You don\'t have any troops in this city!')
         enter()
         return None
 
-    plan = []
-    total_ships = None
-    last = False
-    while True:
+    total_ships = getTotalShips(session)  # This function needs to exist to get the total available ships
+    resources = barbarians_info['resources']
+    ships_needed = math.ceil(Decimal(sum(resources)) / Decimal(500))
 
-        banner()
+    attack_round = {
+        'units': units_for_attack,
+        'ships': min(ships_needed, total_ships),
+        'round': 1,
+        'loot': False  # Assuming loot is not the objective in the automatic attack
+    }
 
-        units_available = {}
-        for unit_id in total_units:
-
-            already_sent = sum([p['units'][u] for p in plan for u in p['units'] if u == unit_id])
-            if already_sent < total_units[unit_id]['amount']:
-                units_available[unit_id] = {}
-                units_available[unit_id]['amount'] = total_units[unit_id]['amount'] - already_sent
-                units_available[unit_id]['name'] = total_units[unit_id]['name']
-
-        if len(units_available) == 0:
-            print(_('No more troops available to send'))
-            enter()
-            break
-
-        attack_round = {}
-        attack_round['units'] = {}
-        print(_('Which troops do you want to send?'))
-        for unit_id in units_available:
-            unit_amount = units_available[unit_id]['amount']
-            unit_name = units_available[unit_id]['name']
-            amount_to_send = read(msg='{} (max: {}): '.format(unit_name, addThousandSeparator(unit_amount)), max=unit_amount, default=0)
-            if amount_to_send > 0:
-                attack_round['units'][unit_id] = amount_to_send
-        print('')
-
-        attack_round['loot'] = last
-        if last:
-            attack_round['round'] = len(plan) + 1
-        else:
-            if len(plan) > 0:
-                round_def = len(plan) + 1
-                attack_round['round'] = read(msg=_('In which battle round do you want to send them? (min: 2, default: {:d}): ').format(round_def), min=2, default=round_def)
-            else:
-                attack_round['round'] = 1
-        print('')
-
-        if last is False:
-            if total_ships is None:
-                total_ships = getTotalShips(session)
-            max_ships = total_ships - sum([ar['ships'] for ar in plan])
-            if max_ships > 0:
-                attack_round['ships'] = read(msg=_('How many ships do you want to send in this round? (min: 0, max: {:d}): ').format(max_ships), min=0, max=max_ships)
-                print('')
-            else:
-                attack_round['ships'] = 0
-
-        plan.append(attack_round)
-
-        if last:
-            break
-
-        print(_('Do you want to send another round of troops? [y/N]'))
-        resp = read(values=['y', 'Y', 'n', 'N'], default='n')
-        if resp.lower() != 'y':
-            print('')
-            print(_('Do you want to select the troops that will be used to collect the remaining resources? (they need to destroy the wall) [y/N]'))
-            resp = read(values=['y', 'Y', 'n', 'N'], default='n')
-            if resp.lower() != 'y':
-                break
-            else:
-                last = True
-
-    plan.sort(key=lambda ar: ar['round'])
-    return plan
+    return [attack_round]
 
 
-def attackBarbarians(session, event, stdin_fd, predetermined_input):
+def attackBarbariansAuto(session, event, stdin_fd, predetermined_input):
     """
     Parameters
     ----------
@@ -220,49 +191,47 @@ def attackBarbarians(session, event, stdin_fd, predetermined_input):
     config.predetermined_input = predetermined_input
     try:
         banner()
-
         island = choose_island(session)
         if island is None:
             event.set()
             return
 
-        babarians_info = get_barbarians_lv(session, island)
-
-        banner()
-        print(_('The barbarians have:'))
-        for name, amount in babarians_info['troops']:
-            print(_('{} units of {}').format(amount, name))
-        print('')
-
-        banner()
-        print(_('From which city do you want to attack?'))
         city = chooseCity(session)
-
-        plan = plan_attack(session, city, babarians_info)
-        if plan is None:
+        if city is None:
             event.set()
             return
 
-        banner()
-        print(_('The barbarians in [{}:{}] will be attacked.').format(island['x'], island['y']))
-        enter()
+        set_child_mode(session)
+        event.set()
 
+        while True:
+            barbarians_info = get_barbarians_lv(session, island)
+            barbarian_level = barbarians_info['level']
+
+            if barbarian_level >= 30:
+                print("Barbarian village reached level 30!")
+                break
+
+            plan = plan_attack(session, city, barbarians_info)
+            if plan is None or len(plan) == 0:
+                print('Unable to plan attack. Exiting...')
+                break
+
+            # Start the attack
+            do_it(session, island, city, barbarians_info, plan)
+            wait_until_attack_is_over(session, city, island)
+
+        print(_('Attacks on barbarians complete.'))
     except KeyboardInterrupt:
         event.set()
-        return
-
-    set_child_mode(session)
-    event.set()
-
-    info = _('\nI attack the barbarians in [{}:{}]\n').format(island['x'], island['y'])
-    setInfoSignal(session, info)
-    try:
-        do_it(session, island, city, babarians_info, plan)
+        print("Process interrupted by user. Exiting...")
     except Exception as e:
-        msg = _('Error in:\n{}\nCause:\n{}').format(info, traceback.format_exc())
+        msg = _('Error in:\n{}\nCause:\n{}').format(plan, traceback.format_exc())
         sendToBot(session, msg)
     finally:
         session.logout()
+
+
 
 
 def get_unit_data(session, city_id, unit_id):
@@ -549,7 +518,9 @@ def do_it(session, island, city, babarians_info, plan):
             battle_start = time.time() + travel_time
 
     wait_until_attack_is_over(session, city, island)
+    wait_random_minutes()
 
     last_round = plan[-1]
     if last_round['loot']:
         loot(session, city, island, units_data, last_round)
+

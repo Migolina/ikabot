@@ -86,10 +86,9 @@ def checkGracePeriods(session):
 
     return alert_gods
 
-def do_it_shrine(session, event, stdin_fd, predetermined_input):
+def AlertShrine(session, event, stdin_fd, predetermined_input):
     sys.stdin = os.fdopen(stdin_fd)
     config.predetermined_input = predetermined_input
-
     cities_ids = getIdsOfCities(session)[0]
     for city_id in cities_ids:
         html = session.get(city_url + city_id)

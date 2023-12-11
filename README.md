@@ -39,6 +39,9 @@ Ikabot is a cross-platform program written in python that grants equal or even m
 | 25 | Configure captcha resolver | It allows you to configure your desired captcha resolver for the Auto-Pirate task. The options you have to choose from are: <ol><li>Default </li><li>Custom</li><li>9kw.eu</li><li>Telegram</li></ol> |
 | 26 | Logs | It allows you to see logs and upload them to pastebin |
 
+update
+^^22^^ presses the donation to gods when 3 hours are remaining if doesn't have enough favor sends message
+^^23^^ Automates the barbarian from 1 to 30. 1-9 needs 21cara, 90sw; 10-19 needs 35 Cara, 60 Sw, 50 SG, 12 M; 20-29 needs 70 Cara, 60 Sw, 100 SG, 30 B, 12 Rams, 12 M, 5 Cooks and loses 18 SG
 # <img src="https://user-images.githubusercontent.com/54487782/236309220-b257d870-6846-4740-a855-dba89deeacaf.png" width="30" height="30"> Install
 
 ## Pre-built Windows binary
