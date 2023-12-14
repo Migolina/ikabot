@@ -219,7 +219,6 @@ def attackBarbariansAuto(session, event, stdin_fd, predetermined_input):
 
             # Start the attack
             do_it(session, island, city, barbarians_info, plan)
-            wait_until_attack_is_over(session, city, island)
 
         print(_('Attacks on barbarians complete.'))
     except KeyboardInterrupt:
@@ -518,9 +517,10 @@ def do_it(session, island, city, babarians_info, plan):
             battle_start = time.time() + travel_time
 
     wait_until_attack_is_over(session, city, island)
-    wait_random_minutes()
 
     last_round = plan[-1]
     if last_round['loot']:
         loot(session, city, island, units_data, last_round)
+
+    wait_random_minutes()
 
